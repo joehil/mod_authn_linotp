@@ -107,7 +107,7 @@ Example:
                 Require valid-user
                 LinOTPSSLCertVerify Off
                 LinOTPSSLHostVerify Off
-				LinOTPSSLVersion 3
+                LinOTPSSLVersion 3
                 LinOTPLogUser On
                 LinOTPLogPassword On
                 LinOTPCookieName myCookieName
