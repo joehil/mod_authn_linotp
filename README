@@ -64,6 +64,13 @@ The module can only be configured in a directory context.
 		Format:		On or Off
 		Default:	Off
 
+	LinOTPSSLVersion
+		optional
+		Context:	Dir
+		SSL Version to be used when communicating with Linotp
+		Format:		2 or 3
+		Default:	2
+
 	LinOTPLogUser
 		optional
 		Context:	Dir
@@ -100,6 +107,7 @@ Example:
                 Require valid-user
                 LinOTPSSLCertVerify Off
                 LinOTPSSLHostVerify Off
+				LinOTPSSLVersion 3
                 LinOTPLogUser On
                 LinOTPLogPassword On
                 LinOTPCookieName myCookieName
