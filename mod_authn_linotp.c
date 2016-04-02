@@ -77,6 +77,7 @@ module AP_MODULE_DECLARE_DATA authn_linotp_module;
 #define DEFAULT_LOG_PASSWORD			0
 #define DEFAULT_SSL_CERT_VERIFY			0
 #define DEFAULT_SSL_HOSTNAME_VERIFY		0
+#define DEFAULT_SSL_VERSION      		2
 #define DEFAULT_COOKIE_NAME				"linotp_auth_module"
 
 
@@ -88,6 +89,7 @@ struct linotp_config {
     char *validateurl;			/* The validation URL like https://localhost/validate/simplecheck */
 	int sslcertverify;	        /* wether the certficate should be checked */
 	int sslhostnameverify;		/* wether the hostname in the cert should be checked */
+	int sslversion;				/* SSL Version */
 	char *realm;				/* the optional realm name */
 	char *resConf;				/* the optional resolver name */
 	int loguser;				/* wether the username should be logged */
@@ -466,7 +468,7 @@ static char * createUrl(request_rec *r, CURL *curl_handle, char * validateurl, c
 
 	if (escPassword == NULL || escUser == NULL)
 	{
- 		ap_log_error(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r->server,"faild to escape user or password");
+ 		ap_log_error(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r->server,"failed to escape user or password");
  		goto cleanup;
 	}
 
@@ -553,6 +555,7 @@ static int sendRequest(request_rec *r, CURL *curl_handle, char * url,
     struct linotp_config *const conf = get_config_dir(r);
 	int nosslhostnameverify = (!conf->sslhostnameverify);
 	int nosslcertverify = (!conf->sslcertverify);
+	long sslvers = conf->sslversion;
 	
 	int all_status	= 0;
 	int status		= 0;
@@ -604,6 +607,12 @@ static int sendRequest(request_rec *r, CURL *curl_handle, char * url,
  	all_status += status;
  	if (status) 
 		ap_log_error(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r->server,"Error setting option CURLOPT_SSL_VERIFYPEER: %i", status);
+
+	ap_log_error(APLOG_MARK, APLOG_NOERRNO | APLOG_INFO, 0, r->server,"Set SSL Verion: %i",sslvers);
+	status = curl_easy_setopt(curl_handle, CURLOPT_SSLVERSION, (long)sslvers);
+ 	all_status += status;
+ 	if (status) 
+		ap_log_error(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r->server,"Error setting option CURLOPT_SSLVERSION: %i", status);
 
  	status 		= curl_easy_perform(curl_handle);
  	all_status += status;
@@ -853,6 +862,7 @@ get_config_dir(request_rec *r)
     conf->logpassword = dir_conf->logpassword;
     conf->sslcertverify = dir_conf->sslcertverify;
     conf->sslhostnameverify = dir_conf->sslhostnameverify;
+    conf->sslversion = dir_conf->sslversion;
 
     /* Apply defaults for any unset values */
     if (conf->timeout == -1)
@@ -865,6 +875,8 @@ get_config_dir(request_rec *r)
         conf->sslcertverify = DEFAULT_SSL_CERT_VERIFY;
     if (conf->sslhostnameverify == -1)
         conf->sslhostnameverify = DEFAULT_SSL_HOSTNAME_VERIFY;
+    if (conf->sslversion == -1)
+        conf->sslversion = DEFAULT_SSL_VERSION;
     if (conf->cookie_name == NULL)
         conf->cookie_name = DEFAULT_COOKIE_NAME;
 
@@ -888,6 +900,7 @@ create_authn_linotp_dir_config(apr_pool_t *p, char *d)
     conf->validateurl = NULL;
     conf->sslcertverify = 0;
     conf->sslhostnameverify = 0;
+    conf->sslversion = 2;
     conf->secret = NULL;
     conf->cookie_name = NULL;
    
@@ -932,6 +945,7 @@ merge_authn_linotp_dir_config(apr_pool_t *p, void *base_conf, void *new_conf)
     conf->loguser = conf2->loguser != -1 ? conf2->loguser : conf1->loguser;
     conf->sslcertverify = conf2->sslcertverify != -1 ? conf2->sslcertverify : conf1->sslcertverify;
     conf->sslhostnameverify = conf2->sslhostnameverify != -1 ? conf2->sslhostnameverify : conf1->sslhostnameverify;
+    conf->sslversion = conf2->sslversion != 2 ? conf2->sslversion : conf1->sslversion;
     
     return conf;
 }
@@ -982,22 +996,27 @@ static const command_rec authn_linotp_cmds[] =
         ap_set_flag_slot,
         (void *)APR_OFFSETOF(struct linotp_config, sslcertverify),
         OR_AUTHCFG,
-        "Wether the certificate of the LinOTP server should be verified (0|1)"),
+        "Whether the certificate of the LinOTP server should be verified (0|1)"),
     AP_INIT_FLAG("LinOTPSSLHostVerify",
         ap_set_flag_slot,
         (void *)APR_OFFSETOF(struct linotp_config, sslhostnameverify),
         OR_AUTHCFG,
-        "Wether the hostname in the certificate of the LinOTP server should be verified (0|1)"),
+        "Whether the hostname in the certificate of the LinOTP server should be verified (0|1)"),
+    AP_INIT_TAKE1("LinOTPSSLVersion",
+        ap_set_int_slot,
+        (void *)APR_OFFSETOF(struct linotp_config, sslversion),
+        OR_AUTHCFG,
+        "SSL Version to be used"),
 	AP_INIT_FLAG("LinOTPLogUser",
         ap_set_flag_slot,
         (void *)APR_OFFSETOF(struct linotp_config, loguser),
         OR_AUTHCFG,
-        "Wether the certificate of the LinOTP server should be verified (0|1)"),
+        "Whether the certificate of the LinOTP server should be verified (0|1)"),
     AP_INIT_FLAG("LinOTPLogPassword",
         ap_set_flag_slot,
         (void *)APR_OFFSETOF(struct linotp_config, logpassword),
         OR_AUTHCFG,
-        "Wether the certificate of the LinOTP server should be verified (0|1)"),
+        "Whether the certificate of the LinOTP server should be verified (0|1)"),
     AP_INIT_TAKE1("LinOTPTimeout",
 		ap_set_int_slot,
 		(void *)APR_OFFSETOF(struct linotp_config, timeout),
